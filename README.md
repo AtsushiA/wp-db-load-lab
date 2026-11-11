@@ -1,5 +1,7 @@
 # WordPress DB 負荷ラボ
 
+[English](README.en.md) | 日本語
+
 WordPress へのアクセスが DB にどんな負荷をかけているかを、ローカルでリアルタイムに可視化するミートアップ用の環境です。
 題材は WordPress 7.2 で入る `/random/`（ランダムな記事へのリダイレクト）です。
 
@@ -36,7 +38,7 @@ cd wp-db-load-lab
 
 setup.sh が行うこと：
 
-1. コンテナを起動する
+1. イメージを取得し、コンテナを起動する
 2. WordPress をインストールする
 3. **WordPress を nightly（7.2 開発版）に更新する**（`/random/` を使うため）
 4. パーマリンクを `/%postname%/` にする
