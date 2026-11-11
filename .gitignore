@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# 各自のポート設定（README「ポートが使われている」参照）。環境ごとに違うのでコミットしない
+.env
+
+# Claude Code の個人設定
+.claude/settings.local.json

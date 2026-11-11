@@ -1,0 +1,655 @@
+{
+  "uid": "wp-db-load",
+  "title": "WordPress DB 負荷ラボ",
+  "tags": [
+    "wordpress",
+    "mysql",
+    "lab"
+  ],
+  "timezone": "browser",
+  "refresh": "2s",
+  "time": {
+    "from": "now-10m",
+    "to": "now"
+  },
+  "timepicker": {
+    "refresh_intervals": [
+      "1s",
+      "2s",
+      "5s",
+      "10s",
+      "30s"
+    ]
+  },
+  "schemaVersion": 39,
+  "version": 1,
+  "editable": true,
+  "graphTooltip": 1,
+  "panels": [
+    {
+      "type": "stat",
+      "title": "クエリ数 / 秒",
+      "description": "MySQL が受け付けた SQL の数（1秒あたり）",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 1,
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_global_status_questions_total[10s]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 1,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "読んだ行数 / 秒",
+      "description": "ストレージエンジンが読んだ行の数。ORDER BY RAND() だと「候補の全件 × アクセス数」になる",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 2,
+      "gridPos": {
+        "x": 6,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[10s]) or rate(mysql_global_status_rows_read_total[10s]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 5000
+              },
+              {
+                "color": "red",
+                "value": 50000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "1クエリあたり読んだ行数",
+      "description": "読んだ行数 ÷ クエリ数。普通のページなら数〜数十",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 3,
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[10s]) or rate(mysql_global_status_rows_read_total[10s])) / clamp_min(sum(rate(mysql_global_status_questions_total[10s])), 0.001)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 100
+              },
+              {
+                "color": "red",
+                "value": 1000
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "同時実行中のクエリ",
+      "description": "いま実行中のスレッド数。DB が詰まり始めると増える",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 4,
+      "gridPos": {
+        "x": 18,
+        "y": 0,
+        "w": 6,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(mysql_global_status_threads_running)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "decimals": 0,
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 4
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "読んだ行数 と クエリ数（1秒あたり）",
+      "description": "クエリ数がほぼ同じでも、読んだ行数が桁違いに増えるのが「重いクエリ」のサイン",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 5,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[10s]) or rate(mysql_global_status_rows_read_total[10s]))",
+          "legendFormat": "読んだ行数",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(mysql_global_status_questions_total[10s]))",
+          "legendFormat": "クエリ数",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Handler：行の読み方の内訳（1秒あたり）",
+      "description": "read_key=インデックスで1点検索 / read_next=インデックス順に次々読む / read_rnd_next=テーブル（一時テーブル含む）を頭から全部読む ",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 6,
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (handler) (rate(mysql_global_status_handlers_total{handler=~\"read_.*\"}[10s]))",
+          "legendFormat": "{{handler}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "normal",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "一時テーブルとフルスキャン（1秒あたり）",
+      "description": "MariaDB では ORDER BY RAND() が毎回「全候補を一時テーブルに書く → 並べ替える」ので一時テーブル作成が跳ねる。MySQL 8.4 は一時テーブルを使わず、候補を読みながら乱数最小の 1 件だけを残すので、ここはほぼ動かない",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 7,
+      "gridPos": {
+        "x": 0,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_global_status_created_tmp_tables_total[10s]))",
+          "legendFormat": "一時テーブル作成",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(mysql_global_status_created_tmp_disk_tables_total[10s]))",
+          "legendFormat": "ディスク一時テーブル作成",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        },
+        {
+          "refId": "C",
+          "expr": "sum(rate(mysql_global_status_select_scan_total[10s]))",
+          "legendFormat": "フルスキャンした SELECT",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "1クエリあたり読んだ行数（推移）",
+      "description": "読んだ行数 ÷ クエリ数。普通のページなら数〜数十。数千を超えたら要注意",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 8,
+      "gridPos": {
+        "x": 12,
+        "y": 14,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_global_status_innodb_row_ops_total{operation=\"read\"}[10s]) or rate(mysql_global_status_rows_read_total[10s])) / clamp_min(sum(rate(mysql_global_status_questions_total[10s])), 0.001)",
+          "legendFormat": "行 / クエリ",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": []
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "クエリ別：1回の実行で調べた行数（上位8）",
+      "description": "performance_schema のダイジェスト（値を ? にまとめた SQL の形）ごと。ORDER BY `RAND` の行がずっと「候補件数」に張り付く",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 9,
+      "gridPos": {
+        "x": 0,
+        "y": 22,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, sum by (digest_text) (rate(mysql_perf_schema_events_statements_rows_examined_total{schema=\"wordpress\"}[30s])) / sum by (digest_text) (rate(mysql_perf_schema_events_statements_total{schema=\"wordpress\"}[30s])))",
+          "legendFormat": "{{digest_text}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "クエリ別：合計実行時間（1秒あたり・上位8）",
+      "description": "DB が 1 秒のうち何秒をそのクエリに使っているか。1 を超えると 1 コア分以上を占有",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 10,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, sum by (digest_text) (rate(mysql_perf_schema_events_statements_seconds_total{schema=\"wordpress\"}[30s])))",
+          "legendFormat": "{{digest_text}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ]
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    }
+  ],
+  "templating": {
+    "list": []
+  },
+  "annotations": {
+    "list": []
+  }
+}

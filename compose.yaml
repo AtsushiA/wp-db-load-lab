@@ -1,0 +1,132 @@
+# WordPress DB Load Lab
+# ミートアップ学習用：WordPress へのアクセスが DB にどんな負荷をかけるかをリアルタイムに可視化する環境
+#
+#   http://localhost:8888  WordPress（admin / admin）
+#   http://localhost:3000  Grafana（ログイン不要）
+#   http://localhost:9090  Prometheus
+#
+# ※ ローカル学習専用です。パスワード類は固定値なので、公開サーバーでは動かさないでください。
+
+name: wp-db-load-lab
+
+x-wp-env: &wp-env
+  WORDPRESS_DB_HOST: db:3306
+  WORDPRESS_DB_USER: wordpress
+  WORDPRESS_DB_PASSWORD: wordpress
+  WORDPRESS_DB_NAME: wordpress
+  WORDPRESS_CONFIG_EXTRA: |
+    define( 'WP_ENVIRONMENT_TYPE', 'local' );
+
+services:
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: wordpress
+      MYSQL_USER: wordpress
+      MYSQL_PASSWORD: wordpress
+    volumes:
+      - db-data:/var/lib/mysql
+      - ./mysql/conf.d:/etc/mysql/conf.d:ro
+      - ./mysql/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "${DB_PORT:-3307}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-uroot", "-proot"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  wordpress:
+    image: wordpress:php8.3-apache
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${WP_PORT:-8888}:80"
+    environment: *wp-env
+    volumes:
+      - wp-core:/var/www/html
+      - ./wordpress/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+
+  # WP-CLI（scripts/*.sh から `docker compose run --rm cli ...` で使う）
+  cli:
+    image: wordpress:cli-php8.3
+    profiles: ["tools"]
+    user: "33:33"          # wordpress イメージの www-data と UID を合わせる
+    depends_on:
+      - wordpress
+    environment:
+      <<: *wp-env
+      HOME: /tmp
+    volumes:
+      - wp-core:/var/www/html
+      - ./wordpress/mu-plugins:/var/www/html/wp-content/mu-plugins:ro
+      - ./scripts/php:/lab:ro
+
+  # MySQL の内部カウンタを Prometheus 形式で公開
+  exporter:
+    image: prom/mysqld-exporter:v0.15.1
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      MYSQLD_EXPORTER_PASSWORD: exporter
+    command:
+      - --mysqld.address=db:3306
+      - --mysqld.username=exporter
+      # クエリの種類（ダイジェスト）ごとの実行回数・時間・調べた行数を取る
+      - --collect.perf_schema.eventsstatements
+      - --collect.perf_schema.eventsstatements.digest_text_limit=200
+      - --collect.perf_schema.eventsstatements.timelimit=300
+      # レプリケーションは使わないので無効化（MySQL 8.4 で不要なエラーログが出るのを防ぐ）
+      - --no-collect.slave_status
+
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    depends_on:
+      - exporter
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=2d
+    volumes:
+      # ファイル単体ではなくディレクトリでマウントする（ファイル単体だと、エディタで保存し直したときに
+      # コンテナ側が古い内容を見続けて設定が反映されないことがある）
+      - ./prometheus:/etc/prometheus:ro
+      - prom-data:/prometheus
+    ports:
+      - "${PROM_PORT:-9090}:9090"
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    depends_on:
+      - prometheus
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: "true"
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 1s
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/wp-db-load.json
+      GF_USERS_DEFAULT_THEME: dark
+    volumes:
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+
+  # 負荷生成（scripts/load.sh から使う）
+  k6:
+    image: grafana/k6:0.53.0
+    profiles: ["tools"]
+    depends_on:
+      - wordpress
+    environment:
+      BASE_URL: http://wordpress
+      WP_HOST: "localhost:${WP_PORT:-8888}"
+    volumes:
+      - ./k6:/scripts:ro
+
+volumes:
+  db-data:
+  wp-core:
+  prom-data:

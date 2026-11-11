@@ -1,0 +1,18 @@
+global:
+  # 「リアルタイム感」を出すため短め。学習用なので本番の値としては参考にしないこと
+  scrape_interval: 2s
+  scrape_timeout: 2s
+  evaluation_interval: 2s
+
+scrape_configs:
+  - job_name: mysql
+    static_configs:
+      - targets: ["exporter:9104"]
+    metric_relabel_configs:
+      # mysqld_exporter は SHOW GLOBAL STATUS のカウンターを「型 unknown・_total なし」の名前で出す。
+      # そのまま rate() に渡すと Grafana のパネルに「metric might not be a counter」という PromQL info（⚠）が出て
+      # エラーに見えるので、ダッシュボードで使うものだけ _total 付きの名前に変える（rows_read は MariaDB 用）
+      - source_labels: [__name__]
+        regex: mysql_global_status_(questions|created_tmp_tables|created_tmp_disk_tables|select_scan|rows_read)
+        target_label: __name__
+        replacement: mysql_global_status_${1}_total
