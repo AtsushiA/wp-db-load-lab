@@ -41,10 +41,18 @@ wp plugin install query-monitor --activate || echo "  （スキップ：ネッ�
 echo "▶ 学習用の投稿を ${POSTS} 件作成"
 wp eval-file /lab/seed.php "$POSTS"
 
-wp option update dblab_strategy rand >/dev/null
+wp option update dblab_strategy sample >/dev/null
 echo
 wp core version --extra | head -1
-wp eval 'echo function_exists("wp_is_random_content_redirect_enabled") && wp_is_random_content_redirect_enabled() ? "✔ /random/ が使えます\n" : "✖ /random/ がありません（7.2 未満）。/?dblab=rand などで比較できます\n";'
+# コアの /random/ がどちらの選び方か（7.2 RC で ORDER BY RAND() から ID のサンプリングに変わった）
+wp eval '
+if ( ! function_exists( "wp_is_random_content_redirect_enabled" ) || ! wp_is_random_content_redirect_enabled() ) {
+	echo "✖ /random/ がありません（7.2 未満）。/?dblab=sample や /?dblab=rand などで比較できます\n";
+} elseif ( function_exists( "wp_random_content_posts_pre_query" ) ) {
+	echo "✔ /random/ が使えます（コアは 7.2 RC 以降の選び方: ランダムな ID を 50 個引く）\n";
+} else {
+	echo "✔ /random/ が使えます（コアは 7.2 beta までの選び方: ORDER BY RAND()。sample 方式は mu-plugin の再現版で動きます）\n";
+}'
 cat <<MSG
 
 準備完了
@@ -52,5 +60,5 @@ cat <<MSG
   Grafana     http://localhost:${GRAFANA_PORT:-3000}   （ダッシュボード「WordPress DB 負荷ラボ」）
   Prometheus  http://localhost:${PROM_PORT:-9090}
 
-次は ./scripts/load.sh /random/ で負荷をかけてみてください。
+次は ./scripts/compare.sh で、変更前（rand）と変更後（sample）を含む各方式を順番に流してみてください。
 MSG

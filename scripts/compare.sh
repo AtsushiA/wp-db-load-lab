@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
 # 方式を順番に流して比較する（Grafana を横に開いておくと段差が見える）
+#   latest（基準）→ rand（変更前: 7.2 beta）→ sample（変更後: 7.2 RC）→ offset → idrange → cached
 #   ./scripts/compare.sh [req/秒=20] [各方式の時間=30s] [休憩秒=15]
 source "$(dirname "$0")/_common.sh"
 RATE="${1:-20}"; DURATION="${2:-30s}"; REST="${3:-15}"
 
 targets=("/?dblab=latest")
-for s in rand offset idrange cached; do targets+=("$(random_url "$s")"); done
+for s in rand sample offset idrange cached; do targets+=("$(random_url "$s")"); done
 
 echo "流量 ${RATE} req/s × ${DURATION}、間に ${REST} 秒休憩"
 for t in "${targets[@]}"; do
