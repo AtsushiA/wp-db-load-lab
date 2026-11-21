@@ -32,14 +32,20 @@ G="(SELECT VARIABLE_VALUE FROM performance_schema.global_status WHERE VARIABLE_N
 S() { echo "(SELECT VARIABLE_VALUE FROM performance_schema.session_status WHERE VARIABLE_NAME='$1')"; }
 
 echo "候補: ${COUNT} 件、MAX(ID): ${MAXID}（ID の密度 $(( COUNT * 100 / (MAXID > 0 ? MAXID : 1) ))%）"
-printf "\n%10s %9s %10s %10s %14s %5s  %s\n" "rows_read" "read_key" "read_next" "read_prev" "read_rnd_next" "tmp表" "方式"
+# 時間はサーバー側で測った SQL 1 文の実行時間（performance_schema の文履歴の TIMER_WAIT）。
+# 履歴は新しい順に「rows_read の差分 → SHOW SESSION STATUS → 測りたい SQL」と並ぶので OFFSET 2 で取る。
+# 測りたい SQL と時間を取る SELECT の間に文を足したら、OFFSET も合わせて変えること
+T="(SELECT ROUND(TIMER_WAIT / 1e9, 3) FROM performance_schema.events_statements_history WHERE THREAD_ID = PS_CURRENT_THREAD_ID() ORDER BY EVENT_ID DESC LIMIT 1 OFFSET 2)"
+# 全角を含む見出しは printf の幅指定だと表示幅がずれるので、空白込みの固定文字列にしている
+printf "\n%10s %9s %10s %10s %14s %5s %s  %s\n" "rows_read" "read_key" "read_next" "read_prev" "read_rnd_next" "tmp表" " 時間(ms)" "方式"
 for i in "${!SQLS[@]}"; do
-  # SHOW SESSION STATUS 自体はカウンタを増やさないので、先に Handler_* を取り、最後に rows_read の差分を取る
+  # SHOW SESSION STATUS 自体はカウンタを増やさないので、先に Handler_* を取り、そのあと rows_read の差分と時間を取る
   out=$(mysql_root -N -e "SET @rr = ${G}; FLUSH STATUS; ${SQLS[$i]};
     SHOW SESSION STATUS WHERE Variable_name IN ('Created_tmp_tables','Handler_read_key','Handler_read_next','Handler_read_prev','Handler_read_rnd_next');
-    SELECT ${G} - @rr;" | tail -6 | awk '{print $NF}' | tr '\n' ' ')
-  read -r tmp key next prev rnext rows <<<"$out"   # 名前順: Created_tmp_tables, Handler_read_key, _next, _prev, _rnd_next、最後に rows_read
-  printf "%10s %9s %10s %10s %14s %5s  %s\n" "$rows" "$key" "$next" "$prev" "$rnext" "$tmp" "${NAMES[$i]}"
+    SELECT ${G} - @rr;
+    SELECT ${T};" | tail -7 | awk '{print $NF}' | tr '\n' ' ')
+  read -r tmp key next prev rnext rows ms <<<"$out"   # 名前順: Created_tmp_tables, Handler_read_key, _next, _prev, _rnd_next、続いて rows_read と時間
+  printf "%10s %9s %10s %10s %14s %5s %9s  %s\n" "$rows" "$key" "$next" "$prev" "$rnext" "$tmp" "$ms" "${NAMES[$i]}"
 done
 
 echo; echo "──── EXPLAIN ANALYZE（rand：変更前）"

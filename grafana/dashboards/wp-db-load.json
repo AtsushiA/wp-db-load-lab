@@ -22,7 +22,7 @@
     ]
   },
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "graphTooltip": 1,
   "panels": [
@@ -38,7 +38,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 5
       },
       "targets": [
@@ -94,9 +94,9 @@
       },
       "id": 2,
       "gridPos": {
-        "x": 6,
+        "x": 4,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 5
       },
       "targets": [
@@ -160,9 +160,9 @@
       },
       "id": 3,
       "gridPos": {
-        "x": 12,
+        "x": 8,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 5
       },
       "targets": [
@@ -218,6 +218,136 @@
     },
     {
       "type": "stat",
+      "title": "SQL 1回の平均時間",
+      "description": "WordPress の SQL 1 文あたりの平均実行時間（performance_schema のダイジェスト別の合計時間 ÷ 実行回数）。普通のページなら 0.1 ms 前後",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 11,
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_perf_schema_events_statements_seconds_total{schema=\"wordpress\"}[30s])) / clamp_min(sum(rate(mysql_perf_schema_events_statements_total{schema=\"wordpress\"}[30s])), 0.001)",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.001
+              },
+              {
+                "color": "red",
+                "value": 0.005
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
+      "title": "SQL に使った時間 / 秒",
+      "description": "DB が 1 秒のうち何秒を SQL の実行に使ったか。1 s を超えると、複数の SQL が同時に走っている（I/O やロックの待ち時間も含む）",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 12,
+      "gridPos": {
+        "x": 16,
+        "y": 0,
+        "w": 4,
+        "h": 5
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(mysql_perf_schema_events_statements_seconds_total{schema=\"wordpress\"}[30s]))",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "colorMode": "background",
+        "graphMode": "area",
+        "textMode": "value",
+        "justifyMode": "center"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "thresholds"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 0.2
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "stat",
       "title": "同時実行中のクエリ",
       "description": "いま実行中のスレッド数。DB が詰まり始めると増える",
       "datasource": {
@@ -226,9 +356,9 @@
       },
       "id": 4,
       "gridPos": {
-        "x": 18,
+        "x": 20,
         "y": 0,
-        "w": 6,
+        "w": 4,
         "h": 5
       },
       "targets": [
@@ -589,6 +719,66 @@
     },
     {
       "type": "timeseries",
+      "title": "クエリ別：1回の実行にかかった時間（上位8）",
+      "description": "performance_schema のダイジェストごとの平均実行時間。変更前の ORDER BY `RAND` は数 ms〜、変更後の ID IN (...) は 0.1 ms 前後",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prom"
+      },
+      "id": 13,
+      "gridPos": {
+        "x": 0,
+        "y": 32,
+        "w": 24,
+        "h": 12
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "topk(8, sum by (digest_text) (rate(mysql_perf_schema_events_statements_seconds_total{schema=\"wordpress\"}[30s])) / sum by (digest_text) (rate(mysql_perf_schema_events_statements_total{schema=\"wordpress\"}[30s])))",
+          "legendFormat": "{{digest_text}}",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prom"
+          }
+        }
+      ],
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true,
+          "calcs": [
+            "lastNotNull",
+            "max"
+          ],
+          "sortBy": "Max",
+          "sortDesc": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "desc"
+        }
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": {
+            "lineWidth": 2,
+            "fillOpacity": 18,
+            "showPoints": "never",
+            "stacking": {
+              "mode": "none",
+              "group": "A"
+            },
+            "spanNulls": true
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
       "title": "クエリ別：合計実行時間（1秒あたり・上位8）",
       "description": "DB が 1 秒のうち何秒をそのクエリに使っているか。1 を超えると 1 コア分以上を占有",
       "datasource": {
@@ -598,7 +788,7 @@
       "id": 10,
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 44,
         "w": 24,
         "h": 10
       },
